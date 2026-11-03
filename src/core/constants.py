@@ -183,15 +183,27 @@ _RAW_TYPE_CHART_OVERRIDES: Final[Dict[PokemonType, Dict[PokemonType, float]]] = 
 
 def _build_complete_matrix() -> Dict[PokemonType, Dict[PokemonType, float]]:
     """
-    Construye la matriz densa de 18x18 inicializando todos los cruces a 1.0 (daño neutro)
-    y aplicando los modificadores elementales de la Generación VI+.
+    Construye la matriz densa de 19x19 inicializando todos los cruces a 1.0 (daño neutro)
+    y aplicando los modificadores elementales de la Generación VI+ y la expansión
+    del tipo Nuclear (Pokémon Uranium).
+
+    Reglas de Nuclear:
+    - Ataque: x2.0 contra todos los tipos, excepto Acero (x0.5) y Nuclear (x0.5).
+    - Defensa: x2.0 recibido de todos los tipos, excepto Nuclear (x0.5).
     """
     matrix: Dict[PokemonType, Dict[PokemonType, float]] = {}
     for atk in PokemonType:
         matrix[atk] = {}
         overrides = _RAW_TYPE_CHART_OVERRIDES.get(atk, {})
         for defender in PokemonType:
-            matrix[atk][defender] = overrides.get(defender, NORMAL)
+            if defender == PokemonType.NUCLEAR:
+                # Defensa Nuclear: debilidad universal (x2.0) excepto ante sí mismo (x0.5)
+                matrix[atk][defender] = RESIST if atk == PokemonType.NUCLEAR else SUPER
+            elif atk == PokemonType.NUCLEAR:
+                # Ataque Nuclear: daño super eficaz (x2.0) a todo excepto Acero y Nuclear (x0.5)
+                matrix[atk][defender] = RESIST if defender in (PokemonType.STEEL, PokemonType.NUCLEAR) else SUPER
+            else:
+                matrix[atk][defender] = overrides.get(defender, NORMAL)
     return matrix
 
 

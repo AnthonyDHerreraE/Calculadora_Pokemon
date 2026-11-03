@@ -33,6 +33,7 @@ class PokemonType(str, Enum):
     DARK = "dark"
     STEEL = "steel"
     FAIRY = "fairy"
+    NUCLEAR = "nuclear"
 
     @property
     def display_name_en(self) -> str:
@@ -61,6 +62,7 @@ class PokemonType(str, Enum):
             PokemonType.DARK: "Siniestro",
             PokemonType.STEEL: "Acero",
             PokemonType.FAIRY: "Hada",
+            PokemonType.NUCLEAR: "Nuclear",
         }
         return es_map[self]
 
@@ -89,6 +91,7 @@ class PokemonType(str, Enum):
             PokemonType.DARK: "#624D4E",
             PokemonType.STEEL: "#60A1B8",
             PokemonType.FAIRY: "#EF70EF",
+            PokemonType.NUCLEAR: "#39FF14",
         }
         return color_map[self]
 
@@ -128,6 +131,7 @@ class PokemonType(str, Enum):
             "dark": PokemonType.DARK,
             "steel": PokemonType.STEEL,
             "fairy": PokemonType.FAIRY,
+            "nuclear": PokemonType.NUCLEAR,
             # Español
             "fuego": PokemonType.FIRE,
             "agua": PokemonType.WATER,

@@ -3,3 +3,6 @@ PySide6>=6.6.0
 
 # Network client for PokéAPI
 requests>=2.31.0
+
+# Packaging and executable distribution
+pyinstaller>=6.0.0

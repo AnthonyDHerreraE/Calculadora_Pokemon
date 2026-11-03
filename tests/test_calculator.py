@@ -14,14 +14,14 @@ class TestTypeMatrixIntegrity(unittest.TestCase):
     """Pruebas de integridad estructural y canonicidad de la matriz de efectividades."""
 
     def test_matrix_dimensions(self) -> None:
-        """Verifica que la matriz contenga exactamente los 18 tipos elementales (18x18 = 324 cruces)."""
-        self.assertEqual(len(ALL_TYPES), 18)
-        self.assertEqual(len(TYPE_CHART), 18)
+        """Verifica que la matriz contenga exactamente los 19 tipos elementales (19x19 = 361 cruces)."""
+        self.assertEqual(len(ALL_TYPES), 19)
+        self.assertEqual(len(TYPE_CHART), 19)
         for atk_type, defenders in TYPE_CHART.items():
             self.assertEqual(
                 len(defenders),
-                18,
-                f"El tipo atacante {atk_type} no tiene 18 defensores definidos."
+                19,
+                f"El tipo atacante {atk_type} no tiene 19 defensores definidos."
             )
 
     def test_valid_multiplier_values(self) -> None:
@@ -55,10 +55,10 @@ class TestMonoTypeCalculations(unittest.TestCase):
     """Pruebas para perfiles de Pokémon con un único tipo elemental."""
 
     def test_pure_normal(self) -> None:
-        """Verifica el perfil defensivo del tipo Normal puro."""
+        """Verifica el perfil defensivo del tipo Normal puro (débil a Lucha y Nuclear)."""
         res = TypeCalculator.calculate(PokemonType.NORMAL)
         self.assertFalse(res.is_dual_type)
-        self.assertEqual(res.weaknesses, (PokemonType.FIGHTING,))
+        self.assertCountEqual(res.weaknesses, [PokemonType.FIGHTING, PokemonType.NUCLEAR])
         self.assertEqual(res.immunities, (PokemonType.GHOST,))
         self.assertEqual(len(res.resistances), 0)
         self.assertEqual(len(res.neutral), 16)
@@ -67,16 +67,17 @@ class TestMonoTypeCalculations(unittest.TestCase):
         """Verifica el perfil defensivo del tipo Fantasma puro."""
         res = TypeCalculator.calculate(PokemonType.GHOST)
         self.assertCountEqual(res.immunities, [PokemonType.NORMAL, PokemonType.FIGHTING])
-        self.assertCountEqual(res.weaknesses, [PokemonType.GHOST, PokemonType.DARK])
+        self.assertCountEqual(res.weaknesses, [PokemonType.GHOST, PokemonType.DARK, PokemonType.NUCLEAR])
         self.assertCountEqual(res.resistances, [PokemonType.POISON, PokemonType.BUG])
 
     def test_pure_steel(self) -> None:
-        """Verifica el perfil defensivo del tipo Acero puro en Gen VI+."""
+        """Verifica el perfil defensivo del tipo Acero puro (resiste Nuclear)."""
         res = TypeCalculator.calculate(PokemonType.STEEL)
         self.assertCountEqual(res.weaknesses, [PokemonType.FIRE, PokemonType.FIGHTING, PokemonType.GROUND])
         self.assertCountEqual(res.immunities, [PokemonType.POISON])
-        self.assertEqual(len(res.resistances), 10)
+        self.assertEqual(len(res.resistances), 11)
         self.assertIn(PokemonType.FAIRY, res.resistances)
+        self.assertIn(PokemonType.NUCLEAR, res.resistances)
         # Neutros: Agua, Eléctrico, Fantasma, Siniestro
         self.assertCountEqual(
             res.neutral,
@@ -102,7 +103,10 @@ class TestDualTypeComplexCombinations(unittest.TestCase):
         self.assertCountEqual(res.weaknesses, [PokemonType.FIRE, PokemonType.GROUND])
         self.assertCountEqual(
             res.neutral,
-            [PokemonType.WATER, PokemonType.ELECTRIC, PokemonType.FIGHTING, PokemonType.GHOST, PokemonType.STEEL]
+            [
+                PokemonType.WATER, PokemonType.ELECTRIC, PokemonType.FIGHTING,
+                PokemonType.GHOST, PokemonType.STEEL, PokemonType.NUCLEAR
+            ]
         )
         self.assertCountEqual(
             res.resistances,
@@ -122,16 +126,15 @@ class TestDualTypeComplexCombinations(unittest.TestCase):
     def test_water_ground(self) -> None:
         """
         Caso de prueba: Agua / Tierra (Ej. Swampert, Quagsire, Gastrodon).
-        Súper Débil (x4): Planta.
+        Súper Débil (x4): Planta, Nuclear (Nuclear hace x2 a Agua y x2 a Tierra).
         Débil (x2): Ninguno.
         Inmune (x0): Eléctrico (Tierra anula debilidad de Agua).
         Resistente (x0.5): Fuego, Veneno, Roca, Acero (4 tipos).
         Súper Resistente (x0.25): Ninguno.
-        Neutros (x1): 12 tipos (incluyendo Agua, ya que Agua resiste Agua 0.5x
-                      pero Tierra es débil a Agua 2.0x, cancelándose a 1.0x).
+        Neutros (x1): 12 tipos.
         """
         res = TypeCalculator.calculate(PokemonType.WATER, PokemonType.GROUND)
-        self.assertCountEqual(res.quad_weaknesses, [PokemonType.GRASS])
+        self.assertCountEqual(res.quad_weaknesses, [PokemonType.GRASS, PokemonType.NUCLEAR])
         self.assertEqual(len(res.weaknesses), 0)
         self.assertCountEqual(res.immunities, [PokemonType.ELECTRIC])
         self.assertEqual(len(res.double_resistances), 0)
@@ -142,20 +145,22 @@ class TestDualTypeComplexCombinations(unittest.TestCase):
         self.assertEqual(len(res.neutral), 12)
         self.assertEqual(res.get_multiplier(PokemonType.ELECTRIC), 0.0)
         self.assertEqual(res.get_multiplier(PokemonType.GRASS), 4.0)
+        self.assertEqual(res.get_multiplier(PokemonType.NUCLEAR), 4.0)
         self.assertEqual(res.get_multiplier(PokemonType.WATER), 1.0)
         self.assertEqual(res.get_multiplier(PokemonType.STEEL), 0.5)
 
     def test_ghost_dark(self) -> None:
         """
         Caso de prueba: Fantasma / Siniestro (Ej. Spiritomb, Sableye).
-        En Gen VI+, su única debilidad es Hada (x2).
+        Súper Débil (x4): Nuclear.
+        Débil (x2): Hada.
         Inmunidades (x0): Normal, Lucha, Psíquico.
         Resistencias (x0.5): Veneno.
         Neutro (x1): Los 13 tipos restantes.
         """
         res = TypeCalculator.calculate(PokemonType.GHOST, PokemonType.DARK)
         self.assertCountEqual(res.weaknesses, [PokemonType.FAIRY])
-        self.assertEqual(len(res.quad_weaknesses), 0)
+        self.assertCountEqual(res.quad_weaknesses, [PokemonType.NUCLEAR])
         self.assertCountEqual(
             res.immunities,
             [PokemonType.NORMAL, PokemonType.FIGHTING, PokemonType.PSYCHIC]
@@ -170,8 +175,7 @@ class TestDualTypeComplexCombinations(unittest.TestCase):
         Inmunidad (x0): Veneno.
         Súper Resistente (x0.25): Planta.
         Resistente (x0.5): Normal, Hielo, Psíquico, Bicho, Dragón, Acero, Hada (7 tipos).
-        Neutro (x1): Agua, Eléctrico, Lucha, Tierra, Volador, Roca, Fantasma, Siniestro (8 tipos).
-        Nota: Roca es neutro (1x) porque Bicho es débil (x2) y Acero lo resiste (x0.5).
+        Neutro (x1): Agua, Eléctrico, Lucha, Tierra, Volador, Roca, Fantasma, Siniestro, Nuclear (9 tipos).
         """
         res = TypeCalculator.calculate(PokemonType.BUG, PokemonType.STEEL)
         self.assertCountEqual(res.quad_weaknesses, [PokemonType.FIRE])
@@ -186,9 +190,33 @@ class TestDualTypeComplexCombinations(unittest.TestCase):
             ]
         )
         self.assertEqual(len(res.resistances), 7)
-        self.assertEqual(len(res.neutral), 8)
+        self.assertEqual(len(res.neutral), 9)
+        self.assertEqual(res.get_multiplier(PokemonType.NUCLEAR), 1.0)
         self.assertEqual(res.get_multiplier(PokemonType.ROCK), 1.0)
-        self.assertEqual(res.get_multiplier(PokemonType.FIRE), 4.0)
+
+    def test_nuclear_type_rules(self) -> None:
+        """
+        Verifica las reglas específicas del tipo Nuclear (Pokémon Uranium):
+        - Ataque: x2.0 contra todos excepto Acero (x0.5) y Nuclear (x0.5).
+        - Defensa: x2.0 recibido de todos excepto Nuclear (x0.5).
+        """
+        # 1. Ataque Nuclear
+        for defender in PokemonType:
+            if defender in (PokemonType.STEEL, PokemonType.NUCLEAR):
+                self.assertEqual(TYPE_CHART[PokemonType.NUCLEAR][defender], 0.5)
+            else:
+                self.assertEqual(TYPE_CHART[PokemonType.NUCLEAR][defender], 2.0)
+
+        # 2. Defensa Nuclear pura
+        res_nuclear = TypeCalculator.calculate(PokemonType.NUCLEAR)
+        self.assertEqual(len(res_nuclear.weaknesses), 18)  # Los 18 tipos tradicionales le pegan x2.0
+        self.assertEqual(res_nuclear.resistances, (PokemonType.NUCLEAR,))
+        self.assertEqual(len(res_nuclear.immunities), 0)
+        self.assertEqual(len(res_nuclear.neutral), 0)
+        self.assertEqual(res_nuclear.get_multiplier(PokemonType.STEEL), 2.0)
+        self.assertEqual(res_nuclear.get_multiplier(PokemonType.NORMAL), 2.0)
+        self.assertEqual(res_nuclear.get_multiplier(PokemonType.FIRE), 2.0)
+        self.assertEqual(res_nuclear.get_multiplier(PokemonType.NUCLEAR), 0.5)
 
 
 class TestCalculatorBehaviorAndEdgeCases(unittest.TestCase):

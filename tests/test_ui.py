@@ -117,9 +117,9 @@ class TestUIComponentsIntegration(unittest.TestCase):
         self.assertTrue(btn._badge_label.isHidden())
 
     def test_type_selector_widget(self) -> None:
-        """Verifica que el TypeSelectorWidget inicialice los 18 botones y responda a clics."""
+        """Verifica que el TypeSelectorWidget inicialice los 19 botones y responda a clics."""
         selector = TypeSelectorWidget(self.controller)
-        self.assertEqual(len(selector._buttons), 18)
+        self.assertEqual(len(selector._buttons), 19)
 
         # Simular clic en Acero y Hada
         selector._on_button_clicked(PokemonType.STEEL)
@@ -223,7 +223,7 @@ class TestUIComponentsIntegration(unittest.TestCase):
 
     def test_main_window_assembly(self) -> None:
         """Verifica que MainWindow ensamble todos los componentes y enlaces de señales."""
-        window = MainWindow()
+        window = MainWindow(auto_load_remote=False)
         self.assertIsNotNone(window.selector_widget)
         self.assertIsNotNone(window.results_dashboard)
         self.assertIsNotNone(window.controller)
@@ -231,6 +231,14 @@ class TestUIComponentsIntegration(unittest.TestCase):
         # Simular flujo completo a través del controlador
         window.controller.toggle_type(PokemonType.FIRE)
         self.assertIn("Fuego", window.statusBar().currentMessage())
+
+        # Probar atajo Escape
+        window.search_bar._input_field.setText("Pikachu")
+        window._on_escape_pressed()
+        self.assertEqual(window.search_bar._input_field.text(), "")
+        self.assertEqual(window.controller.selected_types, ())
+
+        window.close()
 
 
 if __name__ == "__main__":

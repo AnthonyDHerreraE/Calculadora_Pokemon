@@ -93,7 +93,12 @@ class TypeSelectorWidget(QFrame):
             btn = TypeButton(pokemon_type, self)
             btn.clicked.connect(lambda checked=False, t=pokemon_type: self._on_button_clicked(t))
             self._buttons[pokemon_type] = btn
-            grid_layout.addWidget(btn, row, col)
+
+            # Si es el último tipo y queda impar en su fila (ej. 19º tipo Nuclear), centrar simétricamente
+            if index == len(ALL_TYPES) - 1 and len(ALL_TYPES) % columns == 1:
+                grid_layout.addWidget(btn, row, 0, 1, columns, Qt.AlignmentFlag.AlignCenter)
+            else:
+                grid_layout.addWidget(btn, row, col)
 
         layout.addLayout(grid_layout)
 

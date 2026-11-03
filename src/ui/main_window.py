@@ -6,6 +6,7 @@ integrando controladores y el stylesheet global en un tema oscuro premium.
 
 from typing import Optional
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -41,11 +42,17 @@ class MainWindow(QMainWindow):
     - Dashboard de resultados defensivos (ResultsDashboard).
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        auto_load_remote: bool = True,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Calculadora de Tipos Pokémon • Generación VI+")
         self.setMinimumSize(1080, 720)
         self.resize(1260, 820)
+
+        self._auto_load_remote = auto_load_remote
 
         # Controlador de estado desacoplado
         self.controller = TypeSelectionController(self)
@@ -55,6 +62,7 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._connect_signals()
+        self._setup_shortcuts()
 
     def _setup_ui(self) -> None:
         central_widget = QWidget(self)
@@ -82,7 +90,11 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(12)
 
         # Barra de Búsqueda inteligente
-        self.search_bar = SearchBar(self.controller, parent=left_panel)
+        self.search_bar = SearchBar(
+            self.controller,
+            parent=left_panel,
+            auto_load_remote=self._auto_load_remote,
+        )
         left_layout.addWidget(self.search_bar)
 
         # Selector interactivo de tipos (3 columnas x 6 filas)
@@ -212,3 +224,25 @@ class MainWindow(QMainWindow):
         else:
             t1, t2 = selected_types
             self.statusBar().showMessage(f"Tipos seleccionados: {t1.display_name_es} / {t2.display_name_es} (Doble-tipo)")
+
+    def _setup_shortcuts(self) -> None:
+        """Configura los atajos de teclado globales de la ventana."""
+        # Ctrl+F / Cmd+F: Enfocar y seleccionar todo el texto de la barra de búsqueda
+        self._find_shortcut = QShortcut(QKeySequence.StandardKey.Find, self)
+        self._find_shortcut.activated.connect(self.search_bar.focus_and_select_all)
+
+        # Esc: Limpiar campo de búsqueda y deseleccionar tipos activos
+        self._escape_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self._escape_shortcut.activated.connect(self._on_escape_pressed)
+
+    def _on_escape_pressed(self) -> None:
+        """Limpia la barra de búsqueda y restablece la selección activa."""
+        self.search_bar.clear_input()
+        self.controller.clear_selection()
+        self.statusBar().showMessage("Búsqueda y selección restablecidas (Esc).")
+
+    def closeEvent(self, event) -> None:
+        """Asegura la detención limpia de los hilos de red en segundo plano al cerrar."""
+        if hasattr(self, "search_bar") and self.search_bar is not None:
+            self.search_bar.stop_workers()
+        super().closeEvent(event)
