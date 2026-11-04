@@ -77,6 +77,10 @@ def main() -> int:
         PokemonType.NUCLEAR,
     )
 
+    print("\n>>> Demostración de Cobertura Ofensiva STAB: Swampert (Agua / Tierra)")
+    off_demo = TypeCalculator.calculate_offensive_coverage(PokemonType.WATER, PokemonType.GROUND)
+    print(off_demo.summary())
+
     # 3. Demostración de cliente PokéAPI en vivo
     print_banner("VERIFICACIÓN EN VIVO: CONSULTA A POKÉAPI (v2)")
     client = PokeApiClient()

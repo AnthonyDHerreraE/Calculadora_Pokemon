@@ -177,7 +177,7 @@ class MainWindow(QMainWindow):
         title_label = QLabel("CALCULADORA DE TIPOS POKÉMON", header)
         title_label.setObjectName("HeaderTitle")
 
-        subtitle_label = QLabel("Sistema de Análisis Defensivo • Motor Nativo PySide6 • Búsqueda PokéAPI v2", header)
+        subtitle_label = QLabel("Sistema de Análisis Defensivo y Ofensivo (STAB) • PySide6 • Búsqueda Híbrida PokéAPI", header)
         subtitle_label.setObjectName("HeaderSubtitle")
 
         text_layout.addWidget(title_label)
@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         # Tag de versión
-        version_badge = QLabel("FASE 4 • FINAL", header)
+        version_badge = QLabel("FASE 6.1 • OFENSIVA", header)
         version_badge.setStyleSheet(f"""
             background-color: #1F2433;
             color: {COLOR_ACCENT_HOVER};

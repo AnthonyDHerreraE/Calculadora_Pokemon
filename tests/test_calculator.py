@@ -248,6 +248,34 @@ class TestCalculatorBehaviorAndEdgeCases(unittest.TestCase):
         self.assertEqual(res_en.defending_types, (PokemonType.STEEL, PokemonType.FAIRY))
         self.assertEqual(res_accents.defending_types, (PokemonType.ELECTRIC, PokemonType.DRAGON))
 
+    def test_offensive_coverage_mono_and_dual(self) -> None:
+        """Verifica la cobertura ofensiva STAB y la regla de multiplicador máximo."""
+        # 1. Mono-tipo Agua: Súper eficaz contra Fuego, Tierra, Roca
+        off_water = TypeCalculator.calculate_offensive_coverage(PokemonType.WATER)
+        self.assertIn(PokemonType.FIRE, off_water.super_effective)
+        self.assertIn(PokemonType.GROUND, off_water.super_effective)
+        self.assertIn(PokemonType.ROCK, off_water.super_effective)
+        self.assertIn(PokemonType.GRASS, off_water.not_very_effective)
+
+        # 2. Doble-tipo Agua / Tierra (Swampert)
+        # Agua vs Eléctrico es x1.0, pero Tierra vs Eléctrico es x2.0 -> Máximo debe ser x2.0
+        off_wg = TypeCalculator.calculate_offensive_coverage(PokemonType.WATER, PokemonType.GROUND)
+        self.assertIn(PokemonType.ELECTRIC, off_wg.super_effective)
+        self.assertEqual(off_wg.multipliers[PokemonType.ELECTRIC], 2.0)
+
+        # Agua vs Volador es x1.0, Tierra vs Volador es x0.0 -> Máximo debe ser x1.0
+        self.assertIn(PokemonType.FLYING, off_wg.neutral)
+        self.assertEqual(off_wg.multipliers[PokemonType.FLYING], 1.0)
+
+        # Ambos son x0.5 contra Planta -> Máximo debe ser x0.5
+        self.assertIn(PokemonType.GRASS, off_wg.not_very_effective)
+        self.assertEqual(off_wg.multipliers[PokemonType.GRASS], 0.5)
+
+        # Acceso tipo diccionario y to_dict
+        self.assertEqual(off_wg[2.0], list(off_wg.super_effective))
+        self.assertEqual(off_wg["x2"], list(off_wg.super_effective))
+        self.assertIn("super_effective", off_wg.to_dict())
+
     def test_invalid_type_raises_error(self) -> None:
         """Valida excepciones controladas ante tipos inválidos."""
         with self.assertRaises(ValueError):

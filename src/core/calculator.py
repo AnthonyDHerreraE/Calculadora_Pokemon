@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Dict, Optional, Tuple, Union
 from src.core.constants import ALL_TYPES, TYPE_CHART
 from src.core.enums import PokemonType
-from src.core.models import TypeEffectivenessResult
+from src.core.models import TypeEffectivenessResult, OffensiveCoverageResult
 
 
 class TypeCalculator:
@@ -94,6 +94,62 @@ class TypeCalculator:
         return TypeEffectivenessResult(
             primary_type=def1,
             secondary_type=def2,
+            multipliers=multipliers,
+        )
+
+    @classmethod
+    def calculate_offensive_coverage(
+        cls,
+        primary_type: Union[PokemonType, str],
+        secondary_type: Optional[Union[PokemonType, str]] = None,
+    ) -> OffensiveCoverageResult:
+        """
+        Calcula la cobertura ofensiva STAB para un Pokémon con uno o dos tipos atacantes.
+
+        Para cada uno de los 19 tipos defensores, calcula el daño infligido por
+        primary_type y por secondary_type, conservando el multiplicador MÁS ALTO
+        (cobertura óptima del repertorio STAB).
+
+        Args:
+            primary_type: Tipo primario del atacante (PokemonType o str).
+            secondary_type: Tipo secundario opcional (PokemonType, str o None).
+
+        Returns:
+            OffensiveCoverageResult: Objeto con los multiplicadores y agrupaciones (x2, x1, x0.5, x0).
+        """
+        atk1 = cls._coerce_type(primary_type)
+        atk2: Optional[PokemonType] = None
+
+        if secondary_type is not None:
+            coerced_atk2 = cls._coerce_type(secondary_type)
+            if coerced_atk2 != atk1:
+                atk2 = coerced_atk2
+
+        multipliers: Dict[PokemonType, float] = {}
+
+        for def_type in ALL_TYPES:
+            m1 = TYPE_CHART[atk1][def_type]
+            if atk2 is not None:
+                m2 = TYPE_CHART[atk2][def_type]
+                best_m = max(m1, m2)
+            else:
+                best_m = m1
+
+            # Normalización numérica por posibles imprecisiones de coma flotante
+            if abs(best_m - 0.0) < 1e-4:
+                best_m = 0.0
+            elif abs(best_m - 0.5) < 1e-4:
+                best_m = 0.5
+            elif abs(best_m - 1.0) < 1e-4:
+                best_m = 1.0
+            elif abs(best_m - 2.0) < 1e-4:
+                best_m = 2.0
+
+            multipliers[def_type] = best_m
+
+        return OffensiveCoverageResult(
+            primary_type=atk1,
+            secondary_type=atk2,
             multipliers=multipliers,
         )
 

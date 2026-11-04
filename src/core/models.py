@@ -154,3 +154,111 @@ class TypeEffectivenessResult:
             lines.append(f"  {label:<30} [{len(items):02d}] -> {items_str}")
         lines.append("=" * len(header))
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class OffensiveCoverageResult:
+    """
+    Representa el resultado del análisis de cobertura ofensiva STAB
+    de 1 o 2 tipos atacantes frente a todos los tipos defensores puros.
+    Conserva el multiplicador más alto entre los tipos atacantes para cada defensor.
+    """
+    primary_type: PokemonType
+    secondary_type: Optional[PokemonType]
+    multipliers: Mapping[PokemonType, float]
+
+    @property
+    def is_dual_type(self) -> bool:
+        """Indica si el Pokémon atacante posee dos tipos distintos."""
+        return self.secondary_type is not None and self.secondary_type != self.primary_type
+
+    @property
+    def attacking_types(self) -> Tuple[PokemonType, ...]:
+        """Tupla con los tipos atacantes evaluados."""
+        if self.is_dual_type and self.secondary_type is not None:
+            return (self.primary_type, self.secondary_type)
+        return (self.primary_type,)
+
+    @property
+    def super_effective(self) -> Tuple[PokemonType, ...]:
+        """Tipos defensores contra los que se inflige daño súper eficaz (x2.0)."""
+        return tuple(t for t, m in self.multipliers.items() if abs(m - 2.0) < 1e-4)
+
+    @property
+    def neutral(self) -> Tuple[PokemonType, ...]:
+        """Tipos defensores contra los que se inflige daño normal (x1.0)."""
+        return tuple(t for t, m in self.multipliers.items() if abs(m - 1.0) < 1e-4)
+
+    @property
+    def not_very_effective(self) -> Tuple[PokemonType, ...]:
+        """Tipos defensores contra los que se inflige daño poco eficaz (x0.5)."""
+        return tuple(t for t, m in self.multipliers.items() if abs(m - 0.5) < 1e-4)
+
+    @property
+    def no_effect(self) -> Tuple[PokemonType, ...]:
+        """Tipos defensores inmunes o contra los que no surte efecto ningún ataque (x0.0)."""
+        return tuple(t for t, m in self.multipliers.items() if abs(m - 0.0) < 1e-4)
+
+    def grouped_by_multiplier(self) -> Dict[float, List[PokemonType]]:
+        """
+        Agrupa los tipos defensores por multiplicador ofensivo máximo (2.0, 1.0, 0.5, 0.0).
+        """
+        return {
+            2.0: list(self.super_effective),
+            1.0: list(self.neutral),
+            0.5: list(self.not_very_effective),
+            0.0: list(self.no_effect),
+        }
+
+    def __getitem__(self, key: Union[float, str]) -> List[PokemonType]:
+        """Permite acceso directo tipo diccionario: result[2.0], result['x2'], etc."""
+        mapping: Dict[Union[float, str], List[PokemonType]] = {
+            2.0: list(self.super_effective),
+            1.0: list(self.neutral),
+            0.5: list(self.not_very_effective),
+            0.0: list(self.no_effect),
+            "2.0": list(self.super_effective),
+            "1.0": list(self.neutral),
+            "0.5": list(self.not_very_effective),
+            "0.0": list(self.no_effect),
+            "x2": list(self.super_effective),
+            "x1": list(self.neutral),
+            "x0.5": list(self.not_very_effective),
+            "x0": list(self.no_effect),
+        }
+        if key in mapping:
+            return mapping[key]
+        raise KeyError(f"Multiplicador ofensivo no válido: {key}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Exporta el resultado a una estructura de diccionario estándar."""
+        return {
+            "attacking_types": [t.value for t in self.attacking_types],
+            "is_dual_type": self.is_dual_type,
+            "multipliers": {t.value: m for t, m in self.multipliers.items()},
+            "super_effective": [t.value for t in self.super_effective],
+            "neutral": [t.value for t in self.neutral],
+            "not_very_effective": [t.value for t in self.not_very_effective],
+            "no_effect": [t.value for t in self.no_effect],
+        }
+
+    def summary(self, lang: str = "es") -> str:
+        """Genera un informe en texto plano para depuración y consola."""
+        names = " / ".join(
+            (t.display_name_es if lang == "es" else t.display_name_en) for t in self.attacking_types
+        )
+        header = f"=== Cobertura Ofensiva STAB: {names} ==="
+        sections = [
+            ("Súper Efectivo (x2):" if lang == "es" else "Super Effective (x2):", self.super_effective),
+            ("Daño Normal (x1):" if lang == "es" else "Neutral (x1):", self.neutral),
+            ("Poco Efectivo (x0.5):" if lang == "es" else "Not Very Effective (x0.5):", self.not_very_effective),
+            ("Sin Efecto (x0):" if lang == "es" else "No Effect (x0):", self.no_effect),
+        ]
+        lines = [header]
+        for label, items in sections:
+            items_str = ", ".join(
+                (t.display_name_es if lang == "es" else t.display_name_en) for t in items
+            ) if items else "-"
+            lines.append(f"  {label:<28} [{len(items):02d}] -> {items_str}")
+        lines.append("=" * len(header))
+        return "\n".join(lines)

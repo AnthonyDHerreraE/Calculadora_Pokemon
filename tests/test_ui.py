@@ -240,6 +240,30 @@ class TestUIComponentsIntegration(unittest.TestCase):
 
         window.close()
 
+    def test_results_dashboard_tabs_and_offensive_rendering(self) -> None:
+        """Verifica que el QTabWidget contenga las pestañas de defensa y ataque y renderice la cobertura."""
+        from src.ui.components.results_dashboard import DamageGroupSection
+        dashboard = ResultsDashboard()
+        self.assertEqual(dashboard._tab_widget.count(), 2)
+        self.assertIn("Defensivo", dashboard._tab_widget.tabText(0))
+        self.assertIn("Ofensiva", dashboard._tab_widget.tabText(1))
+
+        # Evaluar Agua / Tierra en pestaña ofensiva
+        dashboard.update_selection((PokemonType.WATER, PokemonType.GROUND))
+        atk_items = [
+            dashboard._atk_content_layout.itemAt(i).widget()
+            for i in range(dashboard._atk_content_layout.count())
+            if dashboard._atk_content_layout.itemAt(i) and dashboard._atk_content_layout.itemAt(i).widget()
+        ]
+        atk_sections = [w for w in atk_items if isinstance(w, DamageGroupSection)]
+        atk_multipliers = [s.multiplier_str for s in atk_sections]
+
+        # Agua/Tierra ofensivamente tiene x2, x1, x0.5 y NO tiene x0 (ningún tipo anula a ambos)
+        self.assertIn("x2", atk_multipliers)
+        self.assertIn("x1", atk_multipliers)
+        self.assertIn("x0.5", atk_multipliers)
+        self.assertNotIn("x0", atk_multipliers)
+
 
 if __name__ == "__main__":
     unittest.main()
