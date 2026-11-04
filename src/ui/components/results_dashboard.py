@@ -5,7 +5,7 @@ y la cobertura ofensiva STAB (x2, x1, x0.5, x0) en un sistema de pestañas (QTab
 con TypeChips, animaciones fluidas y eliminación recursiva de widgets para prevenir Memory Leaks.
 """
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Mapping
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PySide6.QtWidgets import (
     QFrame,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.core.enums import PokemonType
+from src.core.constants import ALL_TYPES
 from src.core.calculator import TypeCalculator
 from src.core.models import TypeEffectivenessResult, OffensiveCoverageResult
 from src.ui.components.type_chip import TypeChip
@@ -55,6 +56,8 @@ class DamageGroupSection(QFrame):
         badge_color: str,
         types: Tuple[PokemonType, ...],
         is_subtle: bool = False,
+        source_map: Optional[Mapping[PokemonType, Tuple[PokemonType, ...]]] = None,
+        chip_subtitles: Optional[Mapping[PokemonType, str]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -63,6 +66,8 @@ class DamageGroupSection(QFrame):
         self.badge_color = badge_color
         self.types = types
         self.is_subtle = is_subtle
+        self.source_map = source_map or {}
+        self.chip_subtitles = chip_subtitles or {}
 
         self._setup_ui()
 
@@ -133,7 +138,15 @@ class DamageGroupSection(QFrame):
             mult_val = None
 
         for ptype in self.types:
-            chip = TypeChip(ptype, multiplier=mult_val, parent=chips_container)
+            srcs = self.source_map.get(ptype) if self.source_map else None
+            rich_sub = self.chip_subtitles.get(ptype) if self.chip_subtitles else None
+            chip = TypeChip(
+                ptype,
+                multiplier=mult_val,
+                source_types=srcs,
+                subtitle_rich_text=rich_sub,
+                parent=chips_container,
+            )
             chips_layout.addWidget(chip)
 
         layout.addWidget(chips_container)
@@ -364,6 +377,22 @@ class ResultsDashboard(QFrame):
         """Construye las tarjetas de daño para el análisis defensivo."""
         res_def: TypeEffectivenessResult = TypeCalculator.calculate(primary_type, secondary_type)
 
+        # Generar subtítulos HTML de desglose defensivo cuando hay doble tipo
+        chip_subtitles: Optional[Dict[PokemonType, str]] = None
+        if res_def.is_dual_type and secondary_type is not None:
+            chip_subtitles = {}
+            t1 = primary_type
+            t2 = secondary_type
+            for atk in ALL_TYPES:
+                m1, m2 = res_def.defensive_breakdown.get(atk, (1.0, 1.0))
+                m1_val = m1 if m1 is not None else 1.0
+                m2_val = m2 if m2 is not None else 1.0
+                chip_subtitles[atk] = (
+                    f"<span style='color:{t1.hex_color}'>x{m1_val:g} {t1.display_name_es}</span> "
+                    f"<span style='color:#888888'>•</span> "
+                    f"<span style='color:{t2.hex_color}'>x{m2_val:g} {t2.display_name_es}</span>"
+                )
+
         defensive_groups = [
             ("VULNERABILIDAD EXTREMA", "x4", "#DC2626", res_def.quad_weaknesses, False),
             ("DEBILIDADES", "x2", "#EF4444", res_def.weaknesses, False),
@@ -382,6 +411,7 @@ class ResultsDashboard(QFrame):
                 badge_color=color,
                 types=types_tuple,
                 is_subtle=is_subtle,
+                chip_subtitles=chip_subtitles,
                 parent=self._def_content_widget,
             )
             self._def_content_layout.addWidget(section)
@@ -393,6 +423,7 @@ class ResultsDashboard(QFrame):
             badge_color="#475569",
             types=res_def.neutral,
             is_subtle=True,
+            chip_subtitles=chip_subtitles,
             parent=self._def_content_widget,
         )
         self._def_content_layout.addWidget(normal_section)
@@ -414,6 +445,9 @@ class ResultsDashboard(QFrame):
             ("POCO EFECTIVO", "x0.5", "#10B981", res_atk.not_very_effective, False),
         ]
 
+        # Si el atacante tiene doble tipo, se pasa el mapa de fuentes para eliminar ambigüedades
+        source_map = res_atk.sources if res_atk.is_dual_type else None
+
         for title, mult_str, color, types_tuple, is_subtle in offensive_groups:
             if not types_tuple:
                 continue
@@ -424,6 +458,7 @@ class ResultsDashboard(QFrame):
                 badge_color=color,
                 types=types_tuple,
                 is_subtle=is_subtle,
+                source_map=source_map,
                 parent=self._atk_content_widget,
             )
             self._atk_content_layout.addWidget(section)
@@ -435,6 +470,7 @@ class ResultsDashboard(QFrame):
             badge_color="#475569",
             types=res_atk.neutral,
             is_subtle=True,
+            source_map=source_map,
             parent=self._atk_content_widget,
         )
         self._atk_content_layout.addWidget(normal_section)

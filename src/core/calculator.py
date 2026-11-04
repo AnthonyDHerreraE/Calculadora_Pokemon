@@ -66,14 +66,13 @@ class TypeCalculator:
                 def2 = coerced_def2
 
         multipliers: Dict[PokemonType, float] = {}
+        breakdown: Dict[PokemonType, Tuple[float, Optional[float]]] = {}
 
         for atk in ALL_TYPES:
             mult1 = TYPE_CHART[atk][def1]
-            if def2 is not None:
-                mult2 = TYPE_CHART[atk][def2]
-                final_mult = mult1 * mult2
-            else:
-                final_mult = mult1
+            mult2 = TYPE_CHART[atk][def2] if def2 is not None else None
+            breakdown[atk] = (mult1, mult2)
+            final_mult = mult1 * mult2 if mult2 is not None else mult1
 
             # Normalización numérica por posibles imprecisiones de coma flotante
             if abs(final_mult - 0.0) < 1e-4:
@@ -95,6 +94,7 @@ class TypeCalculator:
             primary_type=def1,
             secondary_type=def2,
             multipliers=multipliers,
+            defensive_breakdown=breakdown,
         )
 
     @classmethod
@@ -126,14 +126,23 @@ class TypeCalculator:
                 atk2 = coerced_atk2
 
         multipliers: Dict[PokemonType, float] = {}
+        sources: Dict[PokemonType, Tuple[PokemonType, ...]] = {}
 
         for def_type in ALL_TYPES:
             m1 = TYPE_CHART[atk1][def_type]
             if atk2 is not None:
                 m2 = TYPE_CHART[atk2][def_type]
                 best_m = max(m1, m2)
+                # Determinar tipos origen que alcanzan dicho multiplicador máximo
+                if abs(m1 - best_m) < 1e-4 and abs(m2 - best_m) < 1e-4:
+                    source_tuple = (atk1, atk2)
+                elif abs(m1 - best_m) < 1e-4:
+                    source_tuple = (atk1,)
+                else:
+                    source_tuple = (atk2,)
             else:
                 best_m = m1
+                source_tuple = (atk1,)
 
             # Normalización numérica por posibles imprecisiones de coma flotante
             if abs(best_m - 0.0) < 1e-4:
@@ -146,11 +155,13 @@ class TypeCalculator:
                 best_m = 2.0
 
             multipliers[def_type] = best_m
+            sources[def_type] = source_tuple
 
         return OffensiveCoverageResult(
             primary_type=atk1,
             secondary_type=atk2,
             multipliers=multipliers,
+            sources=sources,
         )
 
     @classmethod

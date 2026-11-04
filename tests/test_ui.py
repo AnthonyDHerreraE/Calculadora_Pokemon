@@ -148,6 +148,16 @@ class TestUIComponentsIntegration(unittest.TestCase):
         self.assertIn("Fuego", chip.toolTip())
         self.assertIn("x2.0", chip.toolTip())
 
+        # TypeChip con subtítulo de fuentes (eliminación de ambigüedad)
+        chip_with_source = TypeChip(
+            PokemonType.ELECTRIC,
+            multiplier=2.0,
+            source_types=(PokemonType.GROUND,),
+        )
+        self.assertEqual(chip_with_source.height(), 40)
+        self.assertIn("vía Tierra", chip_with_source._source_label.text())
+        self.assertIn("Fuente STAB: Tierra", chip_with_source.toolTip())
+
     def test_damage_group_section(self) -> None:
         """Verifica que DamageGroupSection albergue los TypeChips adecuados."""
         from src.ui.components.results_dashboard import DamageGroupSection
@@ -263,6 +273,29 @@ class TestUIComponentsIntegration(unittest.TestCase):
         self.assertIn("x1", atk_multipliers)
         self.assertIn("x0.5", atk_multipliers)
         self.assertNotIn("x0", atk_multipliers)
+
+        # Verificar que los TypeChips dentro de la sección x2 tengan source_types configurado
+        from src.ui.components.type_chip import TypeChip
+        sec_x2 = [s for s in atk_sections if s.multiplier_str == "x2"][0]
+        chips = sec_x2.findChildren(TypeChip)
+        electric_chips = [c for c in chips if c.pokemon_type == PokemonType.ELECTRIC]
+        self.assertEqual(len(electric_chips), 1)
+        self.assertEqual(electric_chips[0].source_types, (PokemonType.GROUND,))
+        self.assertIn("vía Tierra", electric_chips[0]._source_label.text())
+
+        # Verificar que la pestaña defensiva para Agua / Tierra contenga los subtítulos HTML enriquecidos
+        def_items = [
+            dashboard._def_content_layout.itemAt(i).widget()
+            for i in range(dashboard._def_content_layout.count())
+            if dashboard._def_content_layout.itemAt(i) and dashboard._def_content_layout.itemAt(i).widget()
+        ]
+        def_sections = [w for w in def_items if isinstance(w, DamageGroupSection)]
+        sec_quad = [s for s in def_sections if s.multiplier_str == "x4"][0]
+        grass_chip = [c for c in sec_quad.findChildren(TypeChip) if c.pokemon_type == PokemonType.GRASS][0]
+        self.assertIsNotNone(grass_chip.subtitle_rich_text)
+        self.assertIn("Agua", grass_chip.subtitle_rich_text)
+        self.assertIn("Tierra", grass_chip.subtitle_rich_text)
+        self.assertIn("x2", grass_chip.subtitle_rich_text)
 
 
 if __name__ == "__main__":

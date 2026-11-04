@@ -4,8 +4,8 @@ los resultados del cálculo de efectividad de tipos.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from src.core.enums import EffectivenessCategory, PokemonType
 
 
@@ -18,6 +18,7 @@ class TypeEffectivenessResult:
     primary_type: PokemonType
     secondary_type: Optional[PokemonType]
     multipliers: Mapping[PokemonType, float]
+    defensive_breakdown: Dict[PokemonType, Tuple[float, Optional[float]]] = field(default_factory=dict)
 
     @property
     def is_dual_type(self) -> bool:
@@ -119,6 +120,9 @@ class TypeEffectivenessResult:
             "resistances": [t.value for t in self.resistances],
             "double_resistances": [t.value for t in self.double_resistances],
             "immunities": [t.value for t in self.immunities],
+            "defensive_breakdown": {
+                t.value: list(b) for t, b in self.defensive_breakdown.items()
+            },
         }
 
     def summary(self, lang: str = "es") -> str:
@@ -161,11 +165,13 @@ class OffensiveCoverageResult:
     """
     Representa el resultado del análisis de cobertura ofensiva STAB
     de 1 o 2 tipos atacantes frente a todos los tipos defensores puros.
-    Conserva el multiplicador más alto entre los tipos atacantes para cada defensor.
+    Conserva el multiplicador más alto entre los tipos atacantes para cada defensor
+    y rastrea los tipos origen que provocaron dicho multiplicador.
     """
     primary_type: PokemonType
     secondary_type: Optional[PokemonType]
     multipliers: Mapping[PokemonType, float]
+    sources: Mapping[PokemonType, Tuple[PokemonType, ...]] = field(default_factory=dict)
 
     @property
     def is_dual_type(self) -> bool:
@@ -199,6 +205,10 @@ class OffensiveCoverageResult:
         """Tipos defensores inmunes o contra los que no surte efecto ningún ataque (x0.0)."""
         return tuple(t for t, m in self.multipliers.items() if abs(m - 0.0) < 1e-4)
 
+    def get_sources(self, defending_type: PokemonType) -> Tuple[PokemonType, ...]:
+        """Retorna los tipos atacantes STAB que originan el daño máximo contra el defensor."""
+        return self.sources.get(defending_type, (self.primary_type,))
+
     def grouped_by_multiplier(self) -> Dict[float, List[PokemonType]]:
         """
         Agrupa los tipos defensores por multiplicador ofensivo máximo (2.0, 1.0, 0.5, 0.0).
@@ -208,6 +218,15 @@ class OffensiveCoverageResult:
             1.0: list(self.neutral),
             0.5: list(self.not_very_effective),
             0.0: list(self.no_effect),
+        }
+
+    def grouped_with_sources(self) -> Dict[float, List[Tuple[PokemonType, Tuple[PokemonType, ...]]]]:
+        """
+        Agrupa cada multiplicador con la tupla explícita (tipo_defensor, (tipos_origen,)).
+        """
+        return {
+            mult: [(t, self.get_sources(t)) for t in t_list]
+            for mult, t_list in self.grouped_by_multiplier().items()
         }
 
     def __getitem__(self, key: Union[float, str]) -> List[PokemonType]:
@@ -236,6 +255,7 @@ class OffensiveCoverageResult:
             "attacking_types": [t.value for t in self.attacking_types],
             "is_dual_type": self.is_dual_type,
             "multipliers": {t.value: m for t, m in self.multipliers.items()},
+            "sources": {t.value: [s.value for s in srcs] for t, srcs in self.sources.items()},
             "super_effective": [t.value for t in self.super_effective],
             "neutral": [t.value for t in self.neutral],
             "not_very_effective": [t.value for t in self.not_very_effective],
@@ -248,6 +268,17 @@ class OffensiveCoverageResult:
             (t.display_name_es if lang == "es" else t.display_name_en) for t in self.attacking_types
         )
         header = f"=== Cobertura Ofensiva STAB: {names} ==="
+
+        def format_type_item(t: PokemonType) -> str:
+            t_name = t.display_name_es if lang == "es" else t.display_name_en
+            if self.is_dual_type:
+                srcs = self.get_sources(t)
+                via_names = " / ".join(
+                    (s.display_name_es if lang == "es" else s.display_name_en) for s in srcs
+                )
+                return f"{t_name} (vía {via_names})"
+            return t_name
+
         sections = [
             ("Súper Efectivo (x2):" if lang == "es" else "Super Effective (x2):", self.super_effective),
             ("Daño Normal (x1):" if lang == "es" else "Neutral (x1):", self.neutral),
@@ -256,9 +287,7 @@ class OffensiveCoverageResult:
         ]
         lines = [header]
         for label, items in sections:
-            items_str = ", ".join(
-                (t.display_name_es if lang == "es" else t.display_name_en) for t in items
-            ) if items else "-"
+            items_str = ", ".join(format_type_item(t) for t in items) if items else "-"
             lines.append(f"  {label:<28} [{len(items):02d}] -> {items_str}")
         lines.append("=" * len(header))
         return "\n".join(lines)

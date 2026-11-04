@@ -276,6 +276,12 @@ class TestCalculatorBehaviorAndEdgeCases(unittest.TestCase):
         self.assertEqual(off_wg["x2"], list(off_wg.super_effective))
         self.assertIn("super_effective", off_wg.to_dict())
 
+        # Verificación de rastreo de fuentes ofensivas (resolución de ambigüedad)
+        self.assertEqual(off_wg.get_sources(PokemonType.ELECTRIC), (PokemonType.GROUND,))
+        self.assertEqual(off_wg.get_sources(PokemonType.FLYING), (PokemonType.WATER,))
+        self.assertEqual(off_wg.get_sources(PokemonType.FIRE), (PokemonType.WATER, PokemonType.GROUND))
+        self.assertIn("sources", off_wg.to_dict())
+
     def test_invalid_type_raises_error(self) -> None:
         """Valida excepciones controladas ante tipos inválidos."""
         with self.assertRaises(ValueError):
